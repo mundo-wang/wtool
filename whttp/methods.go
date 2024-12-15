@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"wtool/wlog"
+	"github.com/mundo-wang/wtool/wlog"
 
 	"github.com/google/go-querystring/query"
 )

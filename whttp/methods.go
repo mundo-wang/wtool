@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"github.com/mundo-wang/wtool/wlog"
 
 	"github.com/google/go-querystring/query"
+	"github.com/mundo-wang/wtool/wlog" // 替换为指定的wlog路径
 )
 
 // WithJsonBody 设置JSON请求体

@@ -16,7 +16,8 @@ type HttpClient interface {
 	WithHeader(key, value string) HttpClient
 	WithHeaderByMap(headers map[string]string) HttpClient
 	Send() ([]byte, error)
-	GetRespHeader(key string) []string
+	GetRespHeader(key string) string
+	GetRespHeaders(key string) []string
 }
 
 // httpClient HttpClient接口的实现结构体，私有

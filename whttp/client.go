@@ -16,6 +16,7 @@ type HttpClient interface {
 	WithHeader(key, value string) HttpClient
 	WithHeaderByMap(headers map[string]string) HttpClient
 	Send() ([]byte, error)
+	GetRespHeader(key string) []string
 }
 
 // httpClient HttpClient接口的实现结构体，私有
@@ -26,6 +27,7 @@ type httpClient struct {
 	jsonBody    []byte
 	headers     map[string]string
 	client      *http.Client
+	respHeaders http.Header
 	err         error
 }
 

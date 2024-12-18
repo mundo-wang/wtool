@@ -117,6 +117,7 @@ func (cli *httpClient) Send() ([]byte, error) {
 		return nil, err
 	}
 	defer httpResp.Body.Close()
+	cli.respHeaders = httpResp.Header
 	respBytes, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		wlog.Error("call io.ReadAll failed").Err(err).Field("url", fullURL).Field("method", cli.method).Log()
@@ -137,4 +138,13 @@ func (cli *httpClient) Send() ([]byte, error) {
 	wlog.Error("call cli.client.Do failed").Err(err).Field("url", fullURL).
 		Field("method", cli.method).Field("errorResp", errorResp).Log()
 	return nil, err
+}
+
+// GetHeader 获取指定key的所有响应头值
+func (cli *httpClient) GetRespHeader(key string) []string {
+	values, found := cli.respHeaders[key]
+	if found {
+		return values
+	}
+	return nil
 }

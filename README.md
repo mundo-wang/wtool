@@ -81,16 +81,16 @@ func main() {
 		Age:      30,
 		Address:  "蔡徐村",
 	}
-	respByte, _ := whttp.NewHttpClient(baseURL, http.MethodGet, 10*time.Second).
+	respBytes, _ := whttp.NewHttpClient(baseURL, http.MethodGet, 10*time.Second).
 		WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithQueryParamByStruct(user).Send()
-	fmt.Println(string(respByte))
+	fmt.Println(string(respBytes))
 }
 ```
 
 我们也可以使用`WithQueryParam`方法继续往后面补充`query`参数：
 
 ```go
-respByte, _ := whttp.NewHttpClient(baseURL, http.MethodGet, 10*time.Second).
+respBytes, _ := whttp.NewHttpClient(baseURL, http.MethodGet, 10*time.Second).
 		WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").
 		WithQueryParamByStruct(user).WithQueryParam("address", "caixucun").Send()
 ```
@@ -119,10 +119,19 @@ func main() {
 		Author: "Java之父余胜军",
 		Price:  59.99,
 	}
-	respByte, _ := whttp.NewHttpClient(baseURL, http.MethodPost, 5*time.Second).
+	respBytes, _ := whttp.NewHttpClient(baseURL, http.MethodPost, 5*time.Second).
 		WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithJsonBody(book).Send()
-	fmt.Println(string(resp))
+	fmt.Println(string(respBytes))
 }
+```
+
+如果想获取响应头中的指定参数，可以使用以下代码方式：
+
+```go
+httpClient := whttp.NewHttpClient(baseURL, http.MethodPost, 5*time.Second).
+	WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithJsonBody(book)
+respBytes, _ := httpClient.Send()
+authToken := httpClient.GetRespHeader("authToken")[0]
 ```
 
 目前，该`HTTP`工具仅支持`POST`请求在请求体中使用`JSON`格式传递参数，对于表单或其他格式暂不支持。

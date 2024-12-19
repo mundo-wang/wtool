@@ -131,7 +131,7 @@ func main() {
 httpClient := whttp.NewHttpClient(baseURL, http.MethodPost, 5*time.Second).
 	WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithJsonBody(book)
 respBytes, _ := httpClient.Send()
-authToken := httpClient.GetRespHeader("authToken")[0]
+authToken := httpClient.GetRespHeader("authToken")
 ```
 
 目前，该`HTTP`工具仅支持`POST`请求在请求体中使用`JSON`格式传递参数，对于表单或其他格式暂不支持。

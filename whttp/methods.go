@@ -140,14 +140,14 @@ func (cli *httpClient) Send() ([]byte, error) {
 	return nil, err
 }
 
-// GetRespHeader 获取指定key的响应头值
+// GetRespHeader 获取指定key关联的第一个值，如果无关联，返回空字符串
 func (cli *httpClient) GetRespHeader(key string) string {
 	value := cli.respHeaders.Get(key)
 	return value
 }
 
-// GetRespHeaders 获取指定key关联的所有值，如果无关联，返回空切片
-func (cli *httpClient) GetRespHeaders(key string) []string {
+// GetRespHeaderMulti 获取指定key关联的所有值，如果无关联，返回空切片
+func (cli *httpClient) GetRespHeaderMulti(key string) []string {
 	values := cli.respHeaders.Values(key)
 	return values
 }

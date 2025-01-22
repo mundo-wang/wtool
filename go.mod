@@ -3,6 +3,7 @@ module github.com/mundo-wang/wtool
 go 1.20
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/go-querystring v1.1.0
 	go.uber.org/zap v1.27.0

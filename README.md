@@ -159,65 +159,125 @@ func GetTokenByUserName(userName string) string {
 
 ### 4. Gin标准返回结构
 
-在`Gin`接口中，我们可以按照以下方式使用，以下是代码示例：
+文件中按照以下方式新建错误码：
 
 ```go
-type User struct {
-	Username string `json:"username"`
-	Address  string `json:"address"`
-}
-
-func main() {
-	r := gin.Default()
-	r.GET("/user", func(c *gin.Context) {
-		user := &User{
-			Username: "zhangsan",
-			Address:  "caixucun",
-		}
-		wresp.OK(c, user)
-	})
-	r.Run()
-}
-```
-
-调用接口后，返回的结果如下：
-
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "username": "zhangsan",
-        "address": "caixucun"
-    }
-}
-```
-
-对于`message`，应该采用一套标准化的结构，例如定义一组常量进行统一管理，以确保使用时的一致性。
-
-可以在`codes`目录下进行常量的定义，示例如下：
-
-```go
-const (
-	ParamError        = "参数错误"
-	DBConnectionError = "数据库连接错误"
-	GatewayError      = "网关错误"
+var (
+    InvalidInput = wresp.NewErrorCode(10003, "提交的数据格式无效，请检查输入的内容")
+    Unauthorized = wresp.NewErrorCode(10004, "未登录或权限不足，无法访问此资源")
+    Forbidden    = wresp.NewErrorCode(10005, "访问被拒绝，您没有权限操作此资源，请联系管理员")
+    NotFound     = wresp.NewErrorCode(10006, "请求的资源未找到，请确认URL是否正确")
+    Timeout      = wresp.NewErrorCode(10007, "请求超时，请稍后重试")
 )
 ```
 
-然后，在代码中可以这样使用`Gin`的工具函数：
+错误码是面向前端展示给用户的关键信息。由于用户通常缺乏技术背景，他们依赖错误信息来理解问题发生的原因。因此，为了提升用户体验，错误码应具有足够的区分度，以便用户能够查阅相关文档或向后台人员反馈，从而更高效地定位和解决问题。错误信息应简洁明了，避免使用过于技术化的术语，而要清晰地传达问题的本质原因。
+
+为确保错误码的规范化管理，建议使用纯数字并按业务模块进行分组。这种分组方式有助于简化错误码的管理和查找，显著提高问题定位和排查效率。通过这种设计，错误码系统能够更好地支持业务需求，并与用户高效沟通。
+
+我们先创建以下两个错误码：
 
 ```go
-wresp.Fail(c, http.StatusBadRequest, codes.ParamError)
+UserNotFound     = wresp.NewErrorCode(10008, "未找到对应用户，请检查用户是否存在")
+CreateUserFailed = wresp.NewErrorCode(10009, "创建用户时出错，请检查创建参数")
 ```
 
-调用接口后，返回的结果如下：
+在这里，错误码应该尽量细化，为每一种错误类型分配一个独立的错误码，同时编写清晰、易于理解的错误信息。
 
-```json
-{
-    "code": -1,
-    "message": "参数错误"
+错误码应当应用于`service`层的代码。在此，我们为两个方法添加简洁的错误判断和返回：
+
+```go
+type User struct {
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type CicdUserService struct {
+}
+
+func (ci *CicdUserService) GetUserInfo(id int64) (*User, error) {
+	if id == 10 {
+		return nil, wresp.UserNotFound
+	}
+	user := &User{
+		Id:   id,
+		Name: "zhangsan",
+	}
+	return user, nil
+}
+
+func (ci *CicdUserService) CreateUser(user *User) error {
+	return wresp.CreateUserFailed
 }
 ```
 
-这里只展示通过`c.JSON`方法返回`JSON`格式的内容，其他格式如`XML`、`HTML`等不在本示例中讲解。
+接下来对`controller`层的代码进行修改，具体改动如下：
+
+```go
+type CicdUser struct {
+	service.CicdUserService
+}
+
+func GetCicdUser() *CicdUser {
+	return &CicdUser{}
+}
+
+func (ci *CicdUser) GetUserInfo(c *gin.Context) (interface{}, error) {
+	user, err := ci.CicdUserService.GetUserInfo(10)
+	if err != nil {
+	    wlog.Error("call ci.CicdUserService.GetUserInfo failed").Err(err).Log()
+		return nil, err
+	}
+	return user, nil
+}
+
+func (ci *CicdUser) CreateUser(c *gin.Context) (interface{}, error) {
+	user := &service.User{
+		Id:   20,
+		Name: "lisi",
+	}
+	err := ci.CicdUserService.CreateUser(user)
+	if err != nil {
+	    wlog.Error("call ci.CicdUserService.CreateUser failed").Err(err).Log()
+		return nil, err
+	}
+	return nil, nil
+}
+```
+
+可以看到，我们将两个`Gin`接口函数改造为包装后的方法，这样`controller`层可以直接返回`service`层返回的具体错误码对象（透传），并交由`Gin`返回工具进行处理与返回。
+
+对于`router`部分的代码逻辑，这里做了一些适当改动，如下所示：
+
+```go
+func SetRouter(s *wresp.Server) {
+	cicdV1 := s.Router.Group("/api/v1/cicd")
+	{
+		cicdV1.GET("/get_user", s.WrapHandler(api.GetCicdUser().GetUserInfo))
+		cicdV1.POST("/set_user", s.WrapHandler(api.GetCicdUser().CreateUser))
+	}
+}
+```
+
+这里使用`s.WrapHandler`将`controller`层的方法进行包装，使得返回的结果能够直接交由工具进行处理。
+
+接下来是主函数部分的修改。我们可以看到，`Router`的创建逻辑从`router`目录移到了主函数所在文件的`NewServer`函数中，因此中间件的注册也集中在该函数中处理：
+
+```go
+func main() {
+	s := NewServer()
+	err := s.Router.Run(":8081")
+	if err != nil {
+		wlog.Error("call r.Run failed").Err(err).Field("port", 8081).Log()
+		return
+	}
+}
+
+func NewServer() *wresp.Server {
+	s := &wresp.Server{
+		Router: gin.Default(),
+	}
+	router.SetRouter(s)
+	return s
+}
+```

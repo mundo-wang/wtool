@@ -12,13 +12,13 @@ func init() {
 	StartTokenCleanup()
 }
 
-type tokenStore struct {
-	store sync.Map // 读多写少的情况用sync.Map
-}
-
 type TokenInfo struct {
 	Token      string
 	Expiration time.Time
+}
+
+type tokenStore struct {
+	store sync.Map // 读多写少的情况用sync.Map
 }
 
 type TokenStore interface {
@@ -54,7 +54,7 @@ func (ts *tokenStore) SaveToken(userName, token string, duration time.Duration) 
 func (ts *tokenStore) RetrieveToken(userName string) (string, bool) {
 	val, ok := ts.store.Load(userName)
 	if !ok {
-		return "", false // 没有找到用户对应的token
+		return "", false
 	}
 	info := val.(*TokenInfo)
 	if time.Now().After(info.Expiration) {

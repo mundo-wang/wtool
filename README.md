@@ -148,12 +148,12 @@ authToken := httpClient.GetRespHeader("authToken")
 
 ```go
 func GetTokenByUserName(userName string) string {
-	token, ok := wtoken.Store.GetToken(userName)
-	if !ok {
-		token = "1a4d0042-4939-433b-9d88-aae75adc37b8"
-		wtoken.Store.StoreToken(userName, token, 24 * time.Hour)
-	}
-	return token
+    token, ok := wtoken.Store.RetrieveToken(userName)
+    if !ok {
+        token = "1a4d0042-4939-433b-9d88-aae75adc37b8"
+        wtoken.Store.SaveToken(userName, token, 24*time.Hour)
+    }
+    return token
 }
 ```
 

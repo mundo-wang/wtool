@@ -21,7 +21,7 @@ func init() {
 
 func loadConfig() zap.Config {
 	config := zap.Config{}
-	// 根据具体的环境变量进行调整
+	// 设置环境变量中env的值为production，即可开启生产日志模式
 	if os.Getenv("env") == "production" {
 		config = zap.NewProductionConfig()
 		config.EncoderConfig.TimeKey = "time"
@@ -41,9 +41,9 @@ func loadConfig() zap.Config {
 }
 
 func customTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-	loc, err := time.LoadLocation("Asia/Shanghai") // 使用 CST 时间
+	loc, err := time.LoadLocation("Asia/Shanghai") // 使用CST时间
 	if err != nil {
-		loc = time.UTC // 如果加载时区出错，则使用 UTC 时间
+		loc = time.UTC // 如果加载时区出错，则使用UTC时间
 	}
 	t = t.In(loc)
 	enc.AppendString(t.Format("2006-01-02 15:04:05"))

@@ -1,6 +1,6 @@
 module github.com/mundo-wang/wtool
 
-go 1.21.2
+go 1.21
 
 require (
 	github.com/gin-gonic/gin v1.10.0

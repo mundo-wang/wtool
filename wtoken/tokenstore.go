@@ -18,7 +18,7 @@ type TokenInfo struct {
 }
 
 type tokenStore struct {
-	store sync.Map // 读多写少的情况用sync.Map
+	store sync.Map
 }
 
 type TokenStore interface {

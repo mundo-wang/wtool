@@ -15,7 +15,7 @@ type Server struct {
 type Response struct {
 	Code      int         `json:"code"`
 	Message   string      `json:"message"`
-	PrintInfo string      `json:"PrintInfo"` // 返回到前端，只要不为空字符串，弹窗展示给用户
+	PrintInfo string      `json:"PrintInfo,omitempty"` // 返回到前端，只要有该字段，弹窗展示给用户
 	Data      interface{} `json:"data"`
 }
 
@@ -43,7 +43,7 @@ func handleErrorResponse(c *gin.Context, err error) {
 		response.PrintInfo = e.Error()
 	} else {
 		response.Code = -1
-		response.Message = "未知错误"
+		response.Message = e.Error()
 		response.PrintInfo = "内部错误，请联系平台工作人员"
 	}
 	c.JSON(http.StatusInternalServerError, response)

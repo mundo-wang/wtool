@@ -44,7 +44,7 @@ wlog.Error("call xxx failed").Err(err).Field("name", "lisi").Log()
 {"level":"ERROR","time":"2024-12-16 09:43:08","line":"test06/main.go:46","message":"call xxx failed","error":"some errors","name":"lisi","caller":"main.CallSome"}
 ```
 
-### 2. HTTP工具
+### 2. `HTTP`工具
 
 我们在使用`http`库调用公共接口时，通常需要执行以下步骤：
 
@@ -136,7 +136,7 @@ authToken := httpClient.GetRespHeader("authToken")
 
 目前，该`HTTP`工具仅支持`POST`请求在请求体中使用`JSON`格式传递参数，对于表单或其他格式暂不支持。
 
-### 3. 全局Token存储
+### 3. 全局`Token`存储
 
 在对接多个第三方`OpenAPI`接口时，通常需要先完成权限校验以获取`Token`。假设需要对接`30`个第三方接口，其中一个接口用于获取`Token`，其余`29`个为业务接口。调用业务接口时，必须在请求头中携带有效的`Token`。
 
@@ -157,7 +157,7 @@ func GetTokenByUserName(userName string) string {
 }
 ```
 
-### 4. Gin标准返回结构
+### 4. `Gin`标准返回结构
 
 文件中按照以下方式新建错误码：
 

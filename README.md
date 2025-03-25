@@ -184,7 +184,7 @@ CreateUserFailed = wresp.NewErrorCode(10009, "创建用户时出错，请检查�
 
 在这里，错误码应该尽量细化，为每一种错误类型分配一个独立的错误码，同时编写清晰、易于理解的错误信息。
 
-错误码应当应用于`service`层的代码。在此，我们为两个方法添加简洁的错误判断和返回：
+错误码既可应用于`service`层代码，也可应用于`controller`层代码。我们为`service`层的两个方法添加简洁的错误判断与返回：
 
 ```go
 type User struct {
@@ -192,10 +192,10 @@ type User struct {
 	Name string `json:"name"`
 }
 
-type CicdUserService struct {
+type UserService struct {
 }
 
-func (ci *CicdUserService) GetUserInfo(id int64) (*User, error) {
+func (u *UserService) GetUserInfo(id int64) (*User, error) {
 	if id == 10 {
 		return nil, wresp.UserNotFound
 	}
@@ -206,7 +206,7 @@ func (ci *CicdUserService) GetUserInfo(id int64) (*User, error) {
 	return user, nil
 }
 
-func (ci *CicdUserService) CreateUser(user *User) error {
+func (u *UserService) CreateUser(user *User) error {
 	return wresp.CreateUserFailed
 }
 ```
@@ -214,54 +214,62 @@ func (ci *CicdUserService) CreateUser(user *User) error {
 接下来对`controller`层的代码进行修改，具体改动如下：
 
 ```go
-type CicdUser struct {
-	service.CicdUserService
+type UserApi struct {
+	service.UserService
 }
 
-func GetCicdUser() *CicdUser {
-	return &CicdUser{}
+func GetUserApi() *UserApi {
+	return &UserApi{}
 }
 
-func (ci *CicdUser) GetUserInfo(c *gin.Context) (interface{}, error) {
-	user, err := ci.CicdUserService.GetUserInfo(10)
+func (u *UserApi) GetUserInfo(c *gin.Context) (interface{}, error) {
+	user, err := u.UserService.GetUserInfo(10)
 	if err != nil {
-	    wlog.Error("call ci.CicdUserService.GetUserInfo failed").Err(err).Log()
+        if !wresp.IsErrorCode(err) {
+			wlog.Error("call u.UserService.GetUserInfo failed").Err(err).Field("req", req).Log()
+		}
 		return nil, err
 	}
 	return user, nil
 }
 
-func (ci *CicdUser) CreateUser(c *gin.Context) (interface{}, error) {
+func (u *UserApi) CreateUser(c *gin.Context) (interface{}, error) {
 	user := &service.User{
 		Id:   20,
 		Name: "lisi",
 	}
-	err := ci.CicdUserService.CreateUser(user)
+	err := u.UserService.CreateUser(user)
 	if err != nil {
-	    wlog.Error("call ci.CicdUserService.CreateUser failed").Err(err).Log()
+		if !wresp.IsErrorCode(err) {
+			wlog.Error("call u.UserService.CreateUser failed").Err(err).Field("req", req).Log()
+		}
 		return nil, err
 	}
 	return nil, nil
 }
 ```
 
-可以看到，我们将两个`Gin`接口函数改造为包装后的方法，这样`controller`层可以直接返回`service`层返回的具体错误码对象（透传），并交由`Gin`返回工具进行处理与返回。
+可以看到，我们将两个`Gin`接口函数改造为包装后的方法，这样`controller`层可以直接返回`service`层返回的具体错误码对象（透传），并交由“`Gin`进阶返回结构”工具进行处理与返回。
 
-对于`router`部分的代码逻辑，这里做了一些适当改动，如下所示：
+在`controller`层直接打印`service`层返回的错误码并不合理。此类错误通常源于用户的不当操作，若遭遇恶意攻击，可能会导致系统生成大量`ERROR`级别的日志，干扰正常监控。因此，可以使用`IsErrorCode`函数进行判断：对于业务错误，不记录日志；对于系统错误，则记录日志，以确保系统错误的可追溯性。当前方案仍存在一定不便，后续若有更优解，再进行优化。
+
+对于`router`部分的代码逻辑，改动如下所示：
 
 ```go
 func SetRouter(s *wresp.Server) {
-	cicdV1 := s.Router.Group("/api/v1/cicd")
+    r := s.Router
+	users := r.Group("/api/v1/users")
 	{
-		cicdV1.GET("/get_user", s.WrapHandler(api.GetCicdUser().GetUserInfo))
-		cicdV1.POST("/set_user", s.WrapHandler(api.GetCicdUser().CreateUser))
+		users.GET("/get", s.WrapHandler(api.GetUsersApi().GetUserInfo))
+		users.POST("/set", s.WrapHandler(api.GetUsersApi().CreateUser))
 	}
+    s.Router = r
 }
 ```
 
-这里使用`s.WrapHandler`将`controller`层的方法进行包装，使得返回的结果能够直接交由工具进行处理。
+在每个`router`部分函数的开头，需要从`*wresp.Server`类型的对象`s`中获取`router`对象。完成路由注册后，再将`router`送回`s`。此外，应使用`s.WrapHandler`方法封装`controller`层的方法，以便其返回结果能够直接由工具处理。
 
-接下来是主函数部分的修改。我们可以看到，`Router`的创建逻辑从`router`目录移到了主函数所在文件的`NewServer`函数中，因此中间件的注册也集中在该函数中处理：
+接下来是主函数部分的修改，我们把`router`对象的创建逻辑从`router`目录移交到了主函数文件的`NewServer`函数中：
 
 ```go
 func main() {
@@ -282,6 +290,57 @@ func NewServer() *wresp.Server {
 }
 ```
 
+如果存在多个路由注册函数，可以在`NewServer`函数中统一调用它们进行注册：
+
+```go
+func NewServer() *wresp.Server {
+	s := &wresp.Server{
+		Router: gin.Default(),
+	}
+	router.SetRouter1(s)
+	router.SetRouter2(s)
+	router.SetRouter3(s)
+	return s
+}
+```
+
+对于中间件的编写，我们使用到了`wresp.MiddlewareWrapper`这个函数类型，具体代码如下：
+
+```go
+func MiddlewareA() wresp.MiddlewareWrapper {
+	return func(c *gin.Context) error {
+		fmt.Println("MiddlewareA - Before Next")
+		if c.Query("userName") == "admin" {
+			return code.UserNameAlreadyExist
+		}
+		c.Next()
+		fmt.Println("MiddlewareA - After Next")
+		return nil
+	}
+}
+
+func MiddlewareB() wresp.MiddlewareWrapper {
+	return func(c *gin.Context) error {
+		fmt.Println("MiddlewareB - Before Next")
+		c.Next()
+		fmt.Println("MiddlewareB - After Next")
+		return nil
+	}
+}
+```
+
+值得注意的是，使用上述代码后，我们无需手动调用`c.Abort()`，只需返回错误即可。
+
+注册中间件时，使用到了`WrapMiddleware`方法，代码如下：
+
+```go
+r.Use(s.WrapMiddleware(MiddlewareA()))
+r.Use(s.WrapMiddleware(MiddlewareB()))
+```
+
+这样改造后，中间件代码也能返回错误码格式的`error`了。
+
+### 5. 联系方式
 
 如有任何问题或建议，请通过以下方式联系我：
 

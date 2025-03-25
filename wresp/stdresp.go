@@ -37,6 +37,11 @@ func NewErrorCode(code int, message string) *ErrorCode {
 	}
 }
 
+func IsBusinessError(err error) bool {
+	_, ok := err.(*ErrorCode)
+	return ok
+}
+
 func handleErrorResponse(c *gin.Context, err error, abort bool) {
 	response := &Response{}
 	if e, ok := err.(*ErrorCode); ok {

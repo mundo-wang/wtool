@@ -37,8 +37,8 @@ func NewErrorCode(code int, message string) *ErrorCode {
 	}
 }
 
-// IsBusinessError 用于判断给定的错误是否为定义的错误码（即是否为ErrorCode类型）
-func IsBusinessError(err error) bool {
+// IsErrorCode 用于判断给定的错误是否为定义的错误码（即是否为ErrorCode类型）
+func IsErrorCode(err error) bool {
 	_, ok := err.(*ErrorCode)
 	return ok
 }

@@ -37,7 +37,7 @@ func NewErrorCode(code int, message string) *ErrorCode {
 	}
 }
 
-func handleErrorResponse(c *gin.Context, err error) {
+func handleErrorResponse(c *gin.Context, err error, abort bool) {
 	response := &Response{}
 	if e, ok := err.(*ErrorCode); ok {
 		response.Code = e.Code
@@ -48,14 +48,18 @@ func handleErrorResponse(c *gin.Context, err error) {
 		response.Message = e.Error()
 		response.PrintInfo = "内部错误，请联系平台工作人员"
 	}
-	c.JSON(http.StatusInternalServerError, response)
+	if abort {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response)
+	} else {
+		c.JSON(http.StatusInternalServerError, response)
+	}
 }
 
 func (s *Server) WrapHandler(wrapper HandlerWrapper) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data, err := wrapper(c)
 		if err != nil {
-			handleErrorResponse(c, err)
+			handleErrorResponse(c, err, false)
 			return
 		}
 		response := &Response{
@@ -71,7 +75,7 @@ func (s *Server) WrapMiddleware(wrapper MiddlewareWrapper) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := wrapper(c)
 		if err != nil {
-			handleErrorResponse(c, err)
+			handleErrorResponse(c, err, true)
 			return
 		}
 	}

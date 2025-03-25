@@ -8,6 +8,8 @@ import (
 
 type HandlerWrapper func(c *gin.Context) (interface{}, error)
 
+type MiddlewareWrapper func(c *gin.Context) error
+
 type Server struct {
 	Router *gin.Engine
 }
@@ -49,9 +51,9 @@ func handleErrorResponse(c *gin.Context, err error) {
 	c.JSON(http.StatusInternalServerError, response)
 }
 
-func (s *Server) WrapHandler(handler HandlerWrapper) gin.HandlerFunc {
+func (s *Server) WrapHandler(wrapper HandlerWrapper) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data, err := handler(c)
+		data, err := wrapper(c)
 		if err != nil {
 			handleErrorResponse(c, err)
 			return
@@ -62,5 +64,15 @@ func (s *Server) WrapHandler(handler HandlerWrapper) gin.HandlerFunc {
 			Data:    data,
 		}
 		c.JSON(http.StatusOK, response)
+	}
+}
+
+func (s *Server) WrapMiddleware(wrapper MiddlewareWrapper) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := wrapper(c)
+		if err != nil {
+			handleErrorResponse(c, err)
+			return
+		}
 	}
 }

@@ -222,26 +222,26 @@ func GetUserApi() *UserApi {
 	return &UserApi{}
 }
 
-func (u *UserApi) GetUserInfo(c *gin.Context) (interface{}, error) {
-	user, err := u.UserService.GetUserInfo(10)
+func (api *UserApi) GetUserInfo(c *gin.Context) (interface{}, error) {
+	user, err := api.UserService.GetUserInfo(10)
 	if err != nil {
         if !wresp.IsErrorCode(err) {
-			wlog.Error("call u.UserService.GetUserInfo failed").Err(err).Field("req", req).Log()
+			wlog.Error("call api.UserService.GetUserInfo failed").Err(err).Field("req", req).Log()
 		}
 		return nil, err
 	}
 	return user, nil
 }
 
-func (u *UserApi) CreateUser(c *gin.Context) (interface{}, error) {
+func (api *UserApi) CreateUser(c *gin.Context) (interface{}, error) {
 	user := &service.User{
 		Id:   20,
 		Name: "lisi",
 	}
-	err := u.UserService.CreateUser(user)
+	err := api.UserService.CreateUser(user)
 	if err != nil {
 		if !wresp.IsErrorCode(err) {
-			wlog.Error("call u.UserService.CreateUser failed").Err(err).Field("req", req).Log()
+			wlog.Error("call api.UserService.CreateUser failed").Err(err).Field("req", req).Log()
 		}
 		return nil, err
 	}
@@ -263,7 +263,6 @@ func SetRouter(s *wresp.Server) {
 		users.GET("/get", s.WrapHandler(api.GetUsersApi().GetUserInfo))
 		users.POST("/set", s.WrapHandler(api.GetUsersApi().CreateUser))
 	}
-    s.Router = r
 }
 ```
 
@@ -344,7 +343,7 @@ r.Use(s.WrapMiddleware(MiddlewareB()))
 
 如有任何问题或建议，请通过以下方式联系我：
 
-> - 邮箱：userwsj@126.com
-> - 微信：13136163259
+- 邮箱：userwsj@126.com
+- 微信：13136163259
 
 感谢您的积极反馈！

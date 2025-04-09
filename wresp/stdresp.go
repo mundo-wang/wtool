@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"path/filepath"
 )
 
 type handlerWrapper func(c *gin.Context) (interface{}, error)
 
 type middlewareWrapper func(c *gin.Context) error
+
+type fileDownloadWrapper func(c *gin.Context) (string, error)
 
 type Server struct {
 	Router *gin.Engine
@@ -92,5 +95,21 @@ func (s *Server) WrapMiddleware(wrapper middlewareWrapper) gin.HandlerFunc {
 			handleErrorResponse(c, err, true)
 			return
 		}
+	}
+}
+
+func (s *Server) WrapFileDownload(wrapper fileDownloadWrapper, download bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		filePath, err := wrapper(c)
+		if err != nil {
+			handleErrorResponse(c, err, false)
+			return
+		}
+		if download {
+			fileName := filepath.Base(filePath)
+			c.Header("Content-Type", "application/octet-stream")
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; fileName=%s", fileName))
+		}
+		c.File(filePath)
 	}
 }

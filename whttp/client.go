@@ -15,8 +15,7 @@ type HttpClient[T any] interface {
 	WithQueryParamByStruct(params interface{}) HttpClient[T]
 	WithHeader(key, value string) HttpClient[T]
 	WithHeaderByMap(headers map[string]string) HttpClient[T]
-	Send() HttpClient[T]
-	Error() error
+	Send() (HttpClient[T], error)
 	GetResp() *T
 	GetRespHeader(key string) string
 	GetRespHeaderMulti(key string) []string

@@ -15,8 +15,12 @@ type HttpClient[T any] interface {
 	WithQueryParamByStruct(params interface{}) HttpClient[T]
 	WithHeader(key, value string) HttpClient[T]
 	WithHeaderByMap(headers map[string]string) HttpClient[T]
-	Send() (HttpClient[T], error)
-	GetResp() T
+	Send() (ResponseHandler[T], error)
+}
+
+type ResponseHandler[T any] interface {
+	GetRespBytes() []byte
+	GetParsedData() T
 	GetRespHeader(key string) string
 	GetRespHeaderMulti(key string) []string
 }
@@ -31,9 +35,12 @@ type httpClient[T any] struct {
 	headers     map[string]string
 	client      *http.Client
 	err         error
+}
+
+type responseHandler[T any] struct {
 	respHeaders http.Header
 	respBytes   []byte
-	resp        T
+	parsedData  T
 }
 
 // 泛型类型参数T表示返回的数据结构类型

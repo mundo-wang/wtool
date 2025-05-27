@@ -16,7 +16,7 @@ type HttpClient[T any] interface {
 	WithHeader(key, value string) HttpClient[T]
 	WithHeaderByMap(headers map[string]string) HttpClient[T]
 	Send() (HttpClient[T], error)
-	GetResp() *T
+	GetResp() T
 	GetRespHeader(key string) string
 	GetRespHeaderMulti(key string) []string
 }
@@ -25,6 +25,7 @@ type HttpClient[T any] interface {
 type httpClient[T any] struct {
 	baseURL     string
 	method      string
+	fullURL     string
 	queryParams url.Values
 	jsonBody    []byte
 	headers     map[string]string
@@ -32,7 +33,7 @@ type httpClient[T any] struct {
 	err         error
 	respHeaders http.Header
 	respBytes   []byte
-	resp        *T
+	resp        T
 }
 
 // 泛型类型参数T表示返回的数据结构类型

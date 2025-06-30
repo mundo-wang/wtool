@@ -8,10 +8,19 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"time"
 
 	"github.com/google/go-querystring/query"
 	"github.com/mundo-wang/wtool/wlog" // 替换为指定的wlog路径
 )
+
+// 设置接口超时时间，如果timeout = 0，代表无超时时间
+func (cli *httpClient[T]) WithTimeout(timeout time.Duration) HttpClient[T] {
+	if timeout > 0 {
+		cli.client.Timeout = timeout
+	}
+	return cli
+}
 
 // 设置JSON请求体
 func (cli *httpClient[T]) WithJsonBody(body interface{}) HttpClient[T] {

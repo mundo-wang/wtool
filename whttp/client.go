@@ -8,6 +8,7 @@ import (
 
 // 定义了httpClient所有需要暴露的方法
 type HttpClient[T any] interface {
+	WithTimeout(timeout time.Duration) HttpClient[T]
 	WithJsonBody(body interface{}) HttpClient[T]
 	WithPathParam(args ...string) HttpClient[T]
 	WithQueryParam(key, value string) HttpClient[T]
@@ -43,18 +44,32 @@ type responseHandler[T any] struct {
 	parsedData  T
 }
 
+func Get[T any](baseURL string) HttpClient[T] {
+	return newHttpClient[T](baseURL, http.MethodGet)
+}
+
+func Post[T any](baseURL string) HttpClient[T] {
+	return newHttpClient[T](baseURL, http.MethodPost)
+}
+
+func Put[T any](baseURL string) HttpClient[T] {
+	return newHttpClient[T](baseURL, http.MethodPut)
+}
+
+func Delete[T any](baseURL string) HttpClient[T] {
+	return newHttpClient[T](baseURL, http.MethodDelete)
+}
+
 // 泛型类型参数T表示返回的数据结构类型
-func NewHttpClient[T any](baseURL, method string, timeout time.Duration) HttpClient[T] {
+func newHttpClient[T any](baseURL, method string) HttpClient[T] {
+	// 这里设置的都是默认值，可根据后端服务场景进行修改
 	transport := &http.Transport{
-		MaxIdleConns:        10,
-		MaxIdleConnsPerHost: 10,
-		IdleConnTimeout:     30 * time.Second,
+		MaxIdleConns:        100,              // 全局最大空闲连接数
+		MaxIdleConnsPerHost: 2,                // 每个目标主机最大空闲连接数
+		IdleConnTimeout:     90 * time.Second, // 空闲连接最大存活时间，超过则关闭连接
 	}
 	client := &http.Client{
 		Transport: transport,
-	}
-	if timeout > 0 { // timeout = 0，代表不设置超时时间
-		client.Timeout = timeout
 	}
 	return &httpClient[T]{
 		baseURL:     baseURL,

@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// 定义了httpClient所有需要暴露的方法
 type HttpClient[T any] interface {
+	WithBaseURL(baseURL string) HttpClient[T]
 	WithTimeout(timeout time.Duration) HttpClient[T]
 	WithJsonBody(body interface{}) HttpClient[T]
 	WithPathParam(args ...string) HttpClient[T]
@@ -19,14 +19,6 @@ type HttpClient[T any] interface {
 	Send() (ResponseHandler[T], error)
 }
 
-type ResponseHandler[T any] interface {
-	GetRespBytes() []byte
-	GetParsedData() T
-	GetRespHeader(key string) string
-	GetRespHeaderMulti(key string) []string
-}
-
-// HttpClient接口的实现结构体，私有
 type httpClient[T any] struct {
 	baseURL     string
 	method      string
@@ -38,34 +30,41 @@ type httpClient[T any] struct {
 	err         error
 }
 
+type ResponseHandler[T any] interface {
+	GetRespBytes() []byte
+	GetRespData() T
+	GetRespHeader(key string) string
+	GetRespHeaderMulti(key string) []string
+}
+
 type responseHandler[T any] struct {
 	respHeaders http.Header
 	respBytes   []byte
-	parsedData  T
+	respData    T
 }
 
-func NewGet[T any](baseURL string) HttpClient[T] {
-	return newHttpClient[T](baseURL, http.MethodGet)
+func NewGet[T any]() HttpClient[T] {
+	return newHttpClient[T](http.MethodGet)
 }
 
-func NewPost[T any](baseURL string) HttpClient[T] {
-	return newHttpClient[T](baseURL, http.MethodPost)
+func NewPost[T any]() HttpClient[T] {
+	return newHttpClient[T](http.MethodPost)
 }
 
-func NewPut[T any](baseURL string) HttpClient[T] {
-	return newHttpClient[T](baseURL, http.MethodPut)
+func NewPut[T any]() HttpClient[T] {
+	return newHttpClient[T](http.MethodPut)
 }
 
-func NewPatch[T any](baseURL string) HttpClient[T] {
-	return newHttpClient[T](baseURL, http.MethodPatch)
+func NewPatch[T any]() HttpClient[T] {
+	return newHttpClient[T](http.MethodPatch)
 }
 
-func NewDelete[T any](baseURL string) HttpClient[T] {
-	return newHttpClient[T](baseURL, http.MethodDelete)
+func NewDelete[T any]() HttpClient[T] {
+	return newHttpClient[T](http.MethodDelete)
 }
 
 // 泛型类型参数T表示返回的数据结构类型
-func newHttpClient[T any](baseURL, method string) HttpClient[T] {
+func newHttpClient[T any](method string) HttpClient[T] {
 	// 这里设置的都是默认值，可根据后端服务场景进行修改
 	transport := &http.Transport{
 		MaxIdleConns:        100,              // 全局最大空闲连接数
@@ -76,7 +75,6 @@ func newHttpClient[T any](baseURL, method string) HttpClient[T] {
 		Transport: transport,
 	}
 	return &httpClient[T]{
-		baseURL:     baseURL,
 		method:      method,
 		queryParams: url.Values{},
 		headers:     make(map[string]string),

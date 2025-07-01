@@ -14,6 +14,11 @@ import (
 	"github.com/mundo-wang/wtool/wlog" // 替换为指定的wlog路径
 )
 
+func (cli *httpClient[T]) WithBaseURL(baseURL string) HttpClient[T] {
+	cli.baseURL = baseURL
+	return cli
+}
+
 // 设置接口超时时间，如果timeout = 0，代表无超时时间
 func (cli *httpClient[T]) WithTimeout(timeout time.Duration) HttpClient[T] {
 	if timeout > 0 {
@@ -153,15 +158,15 @@ func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseHandler[T
 		return nil, err
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		var parsedData T
-		if err = json.Unmarshal(respBytes, &parsedData); err != nil {
+		var respData T
+		if err = json.Unmarshal(respBytes, &respData); err != nil {
 			wlog.Error("call json.Unmarshal failed").Err(err).Field("url", cli.fullURL).Log()
 			return nil, err
 		}
 		handler := &responseHandler[T]{
 			respHeaders: resp.Header,
 			respBytes:   respBytes,
-			parsedData:  parsedData,
+			respData:    respData,
 		}
 		return handler, nil
 	}
@@ -182,8 +187,8 @@ func (cli *responseHandler[T]) GetRespBytes() []byte {
 }
 
 // 返回响应体反序列化的对象
-func (cli *responseHandler[T]) GetParsedData() T {
-	return cli.parsedData
+func (cli *responseHandler[T]) GetRespData() T {
+	return cli.respData
 }
 
 // GetRespHeader 获取指定key关联的第一个值，如果无关联，返回空字符串

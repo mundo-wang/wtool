@@ -112,7 +112,7 @@ func (cli *httpClient[T]) WithHeaderByMap(headers map[string]string) HttpClient[
 }
 
 // 发送请求并封装响应
-func (cli *httpClient[T]) Send() (ResponseHandler[T], error) {
+func (cli *httpClient[T]) Send() (ResponseWrapper[T], error) {
 	if cli.err != nil {
 		return nil, cli.err
 	}
@@ -160,7 +160,7 @@ func (cli *httpClient[T]) executeRequest(req *http.Request) (*http.Response, err
 	return resp, nil
 }
 
-func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseHandler[T], error) {
+func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T], error) {
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		wlog.Error("call io.ReadAll failed").Err(err).Field("url", cli.fullURL).Log()
@@ -172,7 +172,7 @@ func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseHandler[T
 			wlog.Error("call json.Unmarshal failed").Err(err).Field("url", cli.fullURL).Log()
 			return nil, err
 		}
-		handler := &responseHandler[T]{
+		handler := &responseWrapper[T]{
 			respHeaders: resp.Header,
 			respBytes:   respBytes,
 			respData:    respData,
@@ -191,23 +191,23 @@ func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseHandler[T
 }
 
 // 返回响应体的字节数组
-func (cli *responseHandler[T]) GetRespBytes() []byte {
+func (cli *responseWrapper[T]) GetRespBytes() []byte {
 	return cli.respBytes
 }
 
 // 返回响应体反序列化的对象
-func (cli *responseHandler[T]) GetRespData() T {
+func (cli *responseWrapper[T]) GetRespData() T {
 	return cli.respData
 }
 
 // GetRespHeader 获取指定key关联的第一个值，如果无关联，返回空字符串
-func (cli *responseHandler[T]) GetRespHeader(key string) string {
+func (cli *responseWrapper[T]) GetRespHeader(key string) string {
 	value := cli.respHeaders.Get(key)
 	return value
 }
 
 // GetRespHeaderMulti 获取指定key关联的所有值，如果无关联，返回空切片
-func (cli *responseHandler[T]) GetRespHeaderMulti(key string) []string {
+func (cli *responseWrapper[T]) GetRespHeaderMulti(key string) []string {
 	values := cli.respHeaders.Values(key)
 	return values
 }

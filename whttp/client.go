@@ -16,7 +16,7 @@ type HttpClient[T any] interface {
 	WithQueryParamByStruct(params interface{}) HttpClient[T]
 	WithHeader(key, value string) HttpClient[T]
 	WithHeaderByMap(headers map[string]string) HttpClient[T]
-	Send() (ResponseHandler[T], error)
+	Send() (ResponseWrapper[T], error)
 }
 
 type httpClient[T any] struct {
@@ -30,14 +30,14 @@ type httpClient[T any] struct {
 	err         error
 }
 
-type ResponseHandler[T any] interface {
+type ResponseWrapper[T any] interface {
 	GetRespBytes() []byte
 	GetRespData() T
 	GetRespHeader(key string) string
 	GetRespHeaderMulti(key string) []string
 }
 
-type responseHandler[T any] struct {
+type responseWrapper[T any] struct {
 	respHeaders http.Header
 	respBytes   []byte
 	respData    T

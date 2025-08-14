@@ -57,107 +57,103 @@ wlog.Error("call xxx failed").Err(err).Field("name", "lisi").Log()
 
 这个过程步骤非常繁琐，需要记住整个步骤，还需要编写大量代码。`HTTP`工具采用链式调用，把这个过程串联起来。
 
-下面以一个`Get`请求和一个`Post`请求为例，讲一下上面日志工具的用法：
+下面以一个`GET`请求和一个`POST`请求为例，讲一下上面日志工具的用法：
 
-- 服务器`IP:Port`：`10.40.18.34:8080`
-- 请求`URL`：`http://10.40.18.34:8080/set_user`
-- 请求方式：`GET`
-- 请求参数：`username`、`age`（必选），`address`（可选）
-- 请求头：`Authorization=a96902a7-bc99-6d2fb2bf1569`
-
-使用我们的`HTTP`工具完成调用过程，代码示例如下：
-
-```go
-type User struct {
-	Username string `url:"username"`
-	Age      int    `url:"age"`
-	Address  string `url:"address,omitempty"`
-}
-
-func main() {
-	baseURL := "http://10.40.18.34:8080/set_user"
-	user := &User{
-		Username: "zhangsan",
-		Age:      30,
-		Address:  "蔡徐村",
-	}
-	respBytes, _ := whttp.NewHttpClient(baseURL, http.MethodGet, 10*time.Second).
-		WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithQueryParamByStruct(user).Send()
-	fmt.Println(string(respBytes))
-}
-```
-
-我们也可以使用`WithQueryParam`方法继续往后面补充`query`参数：
-
-```go
-respBytes, _ := whttp.NewHttpClient(baseURL, http.MethodGet, 10*time.Second).
-		WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").
-		WithQueryParamByStruct(user).WithQueryParam("address", "caixucun").Send()
-```
-
-- 服务器`IP:Port`：`10.40.18.34:8080`
-- 请求`URL`：`http://10.40.18.34:8080/set_book`
+- 服务器`IP:Port`：`10.40.18.34:8280`
+- 请求`URL`：`/user/create`
 - 请求方式：`POST`
-- 请求参数：`title`、`name`、`auther`（必选），`price`（可选）
-- 请求头：`Authorization=a96902a7-bc99-6d2fb2bf1569`、`Content-Type=application/json`
+- 请求参数：`userName`、`password`、`rePassword`、`mobile`（可选）
+- 请求头：`Authorization=b6d4d1f9-69f5-4f2b-ac5c-621c589b7533`、`Content-Type=application/json`
 
 使用我们的`HTTP`工具完成调用过程，代码示例如下：
 
 ```go
-type Book struct {
-	Title  string  `json:"title"`
-	Name   string  `json:"name"`
-	Author string  `json:"author"`
-	Price  float64 `json:"price,omitempty"`
+type CreateUserReq struct {
+	UserName   string `json:"userName"`
+	Password   string `json:"password"`
+	RePassword string `json:"rePassword"`
+	Mobile     string `json:"mobile,omitempty"`
+}
+
+type CreateUserResp struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
 }
 
 func main() {
-	baseURL := "http://10.40.18.34:8080/set_book"
-	book := &Book{
-		Title:  "科技",
-		Name:   "MySQL必知必会",
-		Author: "Java之父余胜军",
-		Price:  59.99,
+	baseURL := "http://10.40.18.34:8280/user/create"
+	reqBody := &CreateUserReq{
+		UserName:   "张三",
+		Password:   "1234567890",
+		RePassword: "1234567890",
 	}
-	respBytes, _ := whttp.NewHttpClient(baseURL, http.MethodPost, 5*time.Second).
-		WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithJsonBody(book).Send()
-	fmt.Println(string(respBytes))
+	respWrapper, _ := whttp.NewPost[CreateUserResp]().WithTimeout(30*time.Second).WithBaseURL(baseURL).
+		WithHeader("Authorization", "b6d4d1f9-69f5-4f2b-ac5c-621c589b7533").WithJsonBody(reqBody).Send()
+	fmt.Println(respWrapper.GetRespData())
 }
 ```
 
-如果想获取响应头中的指定参数，可以使用以下代码方式：
+- 服务器`IP:Port`：`10.40.18.34:8280`
+- 请求`URL`：`/user/get-info`
+- 请求方式：`GET`
+- 请求参数：`user-name`、`mobile`（可选）
+- 请求头：`Authorization=b6d4d1f9-69f5-4f2b-ac5c-621c589b7533`
+
+使用我们的`HTTP`工具完成调用过程，代码示例如下：
 
 ```go
-httpClient := whttp.NewHttpClient(baseURL, http.MethodPost, 5*time.Second).
-	WithHeader("Authorization", "a96902a7-bc99-6d2fb2bf1569").WithJsonBody(book)
-respBytes, _ := httpClient.Send()
-authToken := httpClient.GetRespHeader("authToken")
-```
+type GetUserInfoReq struct {
+	UserName string `url:"user-name"`
+	Mobile   string `url:"mobile,omitempty"`
+}
 
-目前，该`HTTP`工具仅支持`POST`请求在请求体中使用`JSON`格式传递参数，对于表单或其他格式暂不支持。
+type GetUserInfoResp struct {
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Data    UserInfo `json:"data"`
+}
 
-### 3. 全局`Token`存储
+type UserInfo struct {
+	Id       int64  `json:"id"`
+	UserName string `json:"userName"`
+	Mobile   string `json:"mobile"`
+	Email    string `json:"email"`
+	Age      int    `json:"age"`
+}
 
-在对接多个第三方`OpenAPI`接口时，通常需要先完成权限校验以获取`Token`。假设需要对接`30`个第三方接口，其中一个接口用于获取`Token`，其余`29`个为业务接口。调用业务接口时，必须在请求头中携带有效的`Token`。
-
-如果每次调用业务接口前都重新获取`Token`，会导致接口调用频繁，同时显著增加代码复杂度。为优化这一流程，常见的做法是将用户名与`Token`绑定后存储到`Redis`中，并设置一个过期时间。这种方法在某些场景下会带来不便，例如，当开发的功能是对接上下游服务的插件，或系统采用强分布式微服务架构时，往往需要将`Redis`打包到镜像中一并部署，从而增加了部署复杂度和维护成本。
-
-在一些对`Token`丢失不敏感的场景下，我们可以将`Token`存储在一个全局变量中。
-
-一个代码使用示例如下所示：
-
-```go
-func GetTokenByUserName(userName string) string {
-    token, ok := wtoken.Store.RetrieveToken(userName)
-    if !ok {
-        token = "1a4d0042-4939-433b-9d88-aae75adc37b8"
-        wtoken.Store.SaveToken(userName, token, 24*time.Hour)
-    }
-    return token
+func main() {
+	baseURL := "http://10.40.18.34:8280/user/get-info"
+	reqParams := &GetUserInfoReq{
+		UserName: "张三",
+	}
+	respWrapper, _ := whttp.NewGet[GetUserInfoResp]().WithTimeout(30*time.Second).WithBaseURL(baseURL).
+		WithHeader("Authorization", "b6d4d1f9-69f5-4f2b-ac5c-621c589b7533").
+		WithQueryParamByStruct(reqParams).Send()
+	fmt.Println(respWrapper.GetRespData())
 }
 ```
 
-### 4. `Gin`标准返回结构
+同样，我们可以通过使用`WithQueryParam`方法继续向后添加`query`参数，代码如下所示：
+
+```go
+respWrapper, _ := whttp.NewGet[GetUserInfoResp]().WithTimeout(30*time.Second).WithBaseURL(baseURL).
+		WithHeader("Authorization", "b6d4d1f9-69f5-4f2b-ac5c-621c589b7533").
+		WithQueryParamByStruct(reqParams).WithQueryParam("address", "Caixucun").Send()
+```
+
+除了直接获取响应对象，还可以获取响应的字节数组，以及请求头信息：
+
+```go
+respBytes := respWrapper.GetRespBytes()
+token := respWrapper.GetRespHeader("Token")
+names := respWrapper.GetRespHeaderMulti("Name")
+```
+
+在使用`NewGet`、`NewPost`等函数创建`HttpClient`对象时，泛型`T`可以为具体结构体类型，也可以为`map[string]any`类型。目前，该`HTTP`工具仅支持`POST`请求在请求体中使用`JSON`格式传递参数，对于表单或其他格式暂不支持。
+
+
+### 3. `Gin`标准返回结构
 
 文件中按照以下方式新建错误码：
 
@@ -306,25 +302,21 @@ func NewServer() *wresp.Server {
 对于中间件的编写，我们使用到了`wresp.MiddlewareWrapper`这个函数类型，具体代码如下：
 
 ```go
-func MiddlewareA() wresp.MiddlewareWrapper {
-	return func(c *gin.Context) error {
-		fmt.Println("MiddlewareA - Before Next")
-		if c.Query("userName") == "admin" {
-			return code.UserNameAlreadyExist
-		}
-		c.Next()
-		fmt.Println("MiddlewareA - After Next")
-		return nil
+func MiddlewareA(c *gin.Context) error {
+	fmt.Println("MiddlewareA - Before Next")
+	if c.Query("userName") == "admin" {
+		return code.UserNameAlreadyExist
 	}
+	c.Next()
+	fmt.Println("MiddlewareA - After Next")
+	return nil
 }
 
-func MiddlewareB() wresp.MiddlewareWrapper {
-	return func(c *gin.Context) error {
-		fmt.Println("MiddlewareB - Before Next")
-		c.Next()
-		fmt.Println("MiddlewareB - After Next")
-		return nil
-	}
+func MiddlewareB(c *gin.Context) error {
+	fmt.Println("MiddlewareB - Before Next")
+	c.Next()
+	fmt.Println("MiddlewareB - After Next")
+	return nil
 }
 ```
 
@@ -333,11 +325,32 @@ func MiddlewareB() wresp.MiddlewareWrapper {
 注册中间件时，使用到了`WrapMiddleware`方法，代码如下：
 
 ```go
-r.Use(s.WrapMiddleware(MiddlewareA()))
-r.Use(s.WrapMiddleware(MiddlewareB()))
+r.Use(s.WrapMiddleware(MiddlewareA))
+r.Use(s.WrapMiddleware(MiddlewareB))
 ```
 
 这样改造后，中间件代码也能返回错误码格式的`error`了。
+
+### 4. 全局`Token`存储
+
+在对接多个第三方`OpenAPI`接口时，通常需要先完成权限校验以获取`Token`。假设需要对接`30`个第三方接口，其中一个接口用于获取`Token`，其余`29`个为业务接口。调用业务接口时，必须在请求头中携带有效的`Token`。
+
+如果每次调用业务接口前都重新获取`Token`，会导致接口调用频繁，同时显著增加代码复杂度。为优化这一流程，常见的做法是将用户名与`Token`绑定后存储到`Redis`中，并设置一个过期时间。这种方法在某些场景下会带来不便，例如，当开发的功能是对接上下游服务的插件，或系统采用强分布式微服务架构时，往往需要将`Redis`打包到镜像中一并部署，从而增加了部署复杂度和维护成本。
+
+在一些对`Token`丢失不敏感的场景下，我们可以将`Token`存储在一个全局变量中。
+
+一个代码使用示例如下所示：
+
+```go
+func GetTokenByUserName(userName string) string {
+    token, ok := wtoken.Store.RetrieveToken(userName)
+    if !ok {
+        token = "1a4d0042-4939-433b-9d88-aae75adc37b8"
+        wtoken.Store.SaveToken(userName, token, 24*time.Hour)
+    }
+    return token
+}
+```
 
 ### 5. 联系方式
 

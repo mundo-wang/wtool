@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-type handlerWrapper[T interface{}] func(c *gin.Context) (T, error)
+type handlerWrapper[T any] func(c *gin.Context) (T, error)
 
 type middlewareWrapper func(c *gin.Context) error
 
@@ -16,9 +16,9 @@ type fileDownloadWrapper func(c *gin.Context) (string, error)
 type streamHandlerWrapper func(c *gin.Context) error
 
 type response struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"` // 如果code值不为0，前端展示message内容给用户
-	Data    interface{} `json:"data"`    // 接口调用成功时返回的数据
+	Code    int    `json:"code"`
+	Message string `json:"message"` // 如果code值不为0，前端展示message内容给用户
+	Data    any    `json:"data"`    // 接口调用成功时返回的数据
 }
 
 type errorCode struct {
@@ -84,7 +84,7 @@ func writeStreamError(c *gin.Context, err error) {
 	c.Writer.Flush()
 }
 
-func WrapHandler[T interface{}](wrapper handlerWrapper[T]) gin.HandlerFunc {
+func WrapHandler[T any](wrapper handlerWrapper[T]) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data, err := wrapper(c)
 		if err != nil {

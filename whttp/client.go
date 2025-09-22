@@ -11,7 +11,7 @@ import (
 type HttpClient[T any] interface {
 	WithBaseURL(baseURL string) HttpClient[T]
 	WithTimeout(timeout time.Duration) HttpClient[T]
-	WithRetry(retryCount int, retryDelay, retryStep time.Duration) HttpClient[T]
+	WithRetry(retryCount int, retryDelay, maxRetryDelay time.Duration) HttpClient[T]
 	WithJsonBody(body interface{}) HttpClient[T]
 	WithPathParam(args ...string) HttpClient[T]
 	WithQueryParam(key, value string) HttpClient[T]
@@ -23,17 +23,17 @@ type HttpClient[T any] interface {
 }
 
 type httpClient[T any] struct {
-	baseURL     string
-	method      string
-	fullURL     string
-	queryParams url.Values
-	jsonBody    []byte
-	headers     map[string]string
-	client      *http.Client
-	err         error
-	retryCount  int           // 最大重试次数
-	retryDelay  time.Duration // 首次重试延迟
-	retryStep   time.Duration // 每次重试递增时间
+	baseURL       string
+	method        string
+	fullURL       string
+	queryParams   url.Values
+	jsonBody      []byte
+	headers       map[string]string
+	client        *http.Client
+	err           error
+	retryCount    int           // 最大重试次数
+	retryDelay    time.Duration // 首次重试延迟
+	maxRetryDelay time.Duration // 最大重试延迟
 }
 
 type ResponseWrapper[T any] interface {

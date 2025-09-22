@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -28,20 +29,20 @@ func (cli *httpClient[T]) WithTimeout(timeout time.Duration) HttpClient[T] {
 	return cli
 }
 
-// retryCount为最大重试次数，retryDelay为首次重试等待时间，retryStep为每次重试在上一次基础上累加的时间
-func (cli *httpClient[T]) WithRetry(retryCount int, retryDelay, retryStep time.Duration) HttpClient[T] {
+// retryCount为最大重试次数，retryDelay为基础等待时间，maxRetryDelay为最大等待时间
+func (cli *httpClient[T]) WithRetry(retryCount int, retryDelay, maxRetryDelay time.Duration) HttpClient[T] {
 	if retryCount <= 0 {
 		retryCount = 1
 	}
 	if retryDelay <= 0 {
 		retryDelay = time.Second // 默认等待时间1秒
 	}
-	if retryStep < 0 {
-		retryStep = 0
+	if maxRetryDelay <= 0 {
+		maxRetryDelay = retryDelay * 16 // 给个默认最大值
 	}
 	cli.retryCount = retryCount
 	cli.retryDelay = retryDelay
-	cli.retryStep = retryStep
+	cli.maxRetryDelay = maxRetryDelay
 	return cli
 }
 
@@ -170,11 +171,18 @@ func (cli *httpClient[T]) buildRequest() (*http.Request, error) {
 
 func (cli *httpClient[T]) executeRequest(req *http.Request) (*http.Response, error) {
 	var lastErr error
-	attempts := 1 + cli.retryCount // 1次正常请求+N次重试
+	attempts := 1 + cli.retryCount // 1次正常请求 + N次重试
 	for attempt := 0; attempt < attempts; attempt++ {
 		if attempt > 0 {
-			backoff := cli.retryDelay + time.Duration(attempt-1)*cli.retryStep
-			time.Sleep(backoff)
+			// 指数退避：delay = retryDelay * 2^(attempt-1)
+			delay := cli.retryDelay << (attempt - 1)
+			if delay > cli.maxRetryDelay {
+				delay = cli.maxRetryDelay
+			}
+			// 随机抖动：0.5 ~ 1.5 倍
+			jitterFactor := 0.5 + rand.Float64() // rand.Float64() ∈ [0,1)
+			jitterDelay := time.Duration(float64(delay) * jitterFactor)
+			time.Sleep(jitterDelay)
 		}
 		resp, err := cli.client.Do(req)
 		if err == nil {

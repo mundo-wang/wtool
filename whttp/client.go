@@ -1,6 +1,8 @@
 package whttp
 
 import (
+	"errors"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -9,6 +11,7 @@ import (
 type HttpClient[T any] interface {
 	WithBaseURL(baseURL string) HttpClient[T]
 	WithTimeout(timeout time.Duration) HttpClient[T]
+	WithRetry(retryCount int, retryDelay, retryStep time.Duration) HttpClient[T]
 	WithJsonBody(body interface{}) HttpClient[T]
 	WithPathParam(args ...string) HttpClient[T]
 	WithQueryParam(key, value string) HttpClient[T]
@@ -28,6 +31,9 @@ type httpClient[T any] struct {
 	headers     map[string]string
 	client      *http.Client
 	err         error
+	retryCount  int           // 最大重试次数
+	retryDelay  time.Duration // 首次重试延迟
+	retryStep   time.Duration // 每次重试递增时间
 }
 
 type ResponseWrapper[T any] interface {
@@ -80,4 +86,15 @@ func newHttpClient[T any](method string) HttpClient[T] {
 		headers:     make(map[string]string),
 		client:      client,
 	}
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr.Timeout()
+	}
+	return false
 }

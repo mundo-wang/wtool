@@ -28,6 +28,23 @@ func (cli *httpClient[T]) WithTimeout(timeout time.Duration) HttpClient[T] {
 	return cli
 }
 
+// retryCount为最大重试次数，retryDelay为首次重试等待时间，retryStep为每次重试在上一次基础上累加的时间
+func (cli *httpClient[T]) WithRetry(retryCount int, retryDelay, retryStep time.Duration) HttpClient[T] {
+	if retryCount <= 0 {
+		retryCount = 1
+	}
+	if retryDelay <= 0 {
+		retryDelay = time.Second // 默认等待时间1秒
+	}
+	if retryStep < 0 {
+		retryStep = 0
+	}
+	cli.retryCount = retryCount
+	cli.retryDelay = retryDelay
+	cli.retryStep = retryStep
+	return cli
+}
+
 // 设置JSON请求体
 func (cli *httpClient[T]) WithJsonBody(body interface{}) HttpClient[T] {
 	jsonBody, err := json.Marshal(body)
@@ -152,12 +169,25 @@ func (cli *httpClient[T]) buildRequest() (*http.Request, error) {
 }
 
 func (cli *httpClient[T]) executeRequest(req *http.Request) (*http.Response, error) {
-	resp, err := cli.client.Do(req)
-	if err != nil {
-		wlog.Error("call cli.client.Do failed").Err(err).Field("url", cli.fullURL).Log()
-		return nil, err
+	var lastErr error
+	attempts := 1 + cli.retryCount // 1次正常请求+N次重试
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			backoff := cli.retryDelay + time.Duration(attempt-1)*cli.retryStep
+			time.Sleep(backoff)
+		}
+		resp, err := cli.client.Do(req)
+		if err == nil {
+			return resp, nil
+		}
+		wlog.Error("call cli.client.Do failed").Err(err).Field("url", cli.fullURL).Field("attempt", attempt+1).Log()
+		// 只对超时错误进行重试处理，非超时错误直接返回
+		if !isTimeoutError(err) {
+			return nil, err
+		}
+		lastErr = err
 	}
-	return resp, nil
+	return nil, lastErr
 }
 
 func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T], error) {

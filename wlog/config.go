@@ -1,11 +1,12 @@
 package wlog
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"log"
 	"os"
 	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var logger *zap.Logger
@@ -21,16 +22,16 @@ func init() {
 
 func loadConfig() zap.Config {
 	config := zap.Config{}
-	// 设置环境变量中env的值为production，即可开启生产日志模式
-	if os.Getenv("env") == "production" {
+	// 仅当明确是开发环境时，才使用Development配置，其余环境（测试、预发、生产等）统一使用结构化日志
+	if os.Getenv("env") == "development" {
+		config = zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	} else {
 		config = zap.NewProductionConfig()
 		config.EncoderConfig.TimeKey = "time"
 		config.EncoderConfig.MessageKey = "message"
 		config.EncoderConfig.CallerKey = "line"
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	} else {
-		config = zap.NewDevelopmentConfig()
-		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	}
 	config.OutputPaths = []string{"stdout"}
 	config.ErrorOutputPaths = []string{"stderr"}

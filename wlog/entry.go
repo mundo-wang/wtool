@@ -1,13 +1,15 @@
 package wlog
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"path"
 	"runtime"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type LoggerEntry interface {
+	// 注意：打印日志语句必须在调用链的末尾调用.Log()方法，否则日志无法正常输出
 	Field(key string, value interface{}) LoggerEntry
 	Err(err error) LoggerEntry
 	Skip(skip int) LoggerEntry

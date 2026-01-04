@@ -26,6 +26,7 @@ func loadConfig() zap.Config {
 	if os.Getenv("env") == "development" {
 		config = zap.NewDevelopmentConfig()
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		config.OutputPaths = []string{"stdout"}
 	} else {
 		config = zap.NewProductionConfig()
 		config.EncoderConfig.TimeKey = "time"
@@ -33,8 +34,6 @@ func loadConfig() zap.Config {
 		config.EncoderConfig.CallerKey = "line"
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	}
-	config.OutputPaths = []string{"stdout"}
-	config.ErrorOutputPaths = []string{"stderr"}
 	config.EncoderConfig.EncodeTime = customTimeEncoder
 	config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 	config.DisableStacktrace = true

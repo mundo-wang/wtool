@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
-	"github.com/mundo-wang/wtool/wlog" // 替换为指定的wlog路径
 )
 
 func (cli *httpClient[T]) WithBaseURL(baseURL string) HttpClient[T] {
@@ -50,7 +49,6 @@ func (cli *httpClient[T]) WithRetry(retryCount int, retryDelay, maxRetryDelay ti
 func (cli *httpClient[T]) WithJsonBody(body interface{}) HttpClient[T] {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
-		wlog.Error("call json.Marshal failed").Err(err).Field("url", cli.baseURL).Log()
 		cli.err = err
 		return cli
 	}
@@ -67,7 +65,6 @@ func (cli *httpClient[T]) WithPathParam(args ...string) HttpClient[T] {
 	matches := rePathVar.FindAllString(cli.baseURL, -1)
 	if len(matches) != len(args) {
 		err := fmt.Errorf("path param count mismatch: expected %d, got %d", len(matches), len(args))
-		wlog.Error("call rePathVar.FindAllString failed").Err(err).Field("url", cli.baseURL).Log()
 		cli.err = err
 		return cli
 	}
@@ -101,7 +98,6 @@ func (cli *httpClient[T]) WithQueryParamByMap(params map[string]string) HttpClie
 func (cli *httpClient[T]) WithQueryParamByStruct(params interface{}) HttpClient[T] {
 	queryParams, err := query.Values(params)
 	if err != nil {
-		wlog.Error("call query.Values failed").Err(err).Field("url", cli.baseURL).Log()
 		cli.err = err
 		return cli
 	}
@@ -160,7 +156,6 @@ func (cli *httpClient[T]) buildRequest() (*http.Request, error) {
 	}
 	req, err := http.NewRequest(cli.method, fullURL, body)
 	if err != nil {
-		wlog.Error("call http.NewRequest failed").Err(err).Field("url", cli.fullURL).Log()
 		return nil, err
 	}
 	for key, value := range cli.headers {
@@ -188,7 +183,6 @@ func (cli *httpClient[T]) executeRequest(req *http.Request) (*http.Response, err
 		if err == nil {
 			return resp, nil
 		}
-		wlog.Error("call cli.client.Do failed").Err(err).Field("url", cli.fullURL).Field("attempt", attempt+1).Log()
 		// 只对超时错误进行重试处理，非超时错误直接返回
 		if !isTimeoutError(err) {
 			return nil, err
@@ -201,13 +195,11 @@ func (cli *httpClient[T]) executeRequest(req *http.Request) (*http.Response, err
 func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T], error) {
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		wlog.Error("call io.ReadAll failed").Err(err).Field("url", cli.fullURL).Log()
 		return nil, err
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		var respData T
 		if err = json.Unmarshal(respBytes, &respData); err != nil {
-			wlog.Error("call json.Unmarshal failed").Err(err).Field("url", cli.fullURL).Log()
 			return nil, err
 		}
 		handler := &responseWrapper[T]{
@@ -219,12 +211,9 @@ func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T
 	}
 	var errorResp map[string]any
 	if err = json.Unmarshal(respBytes, &errorResp); err != nil {
-		wlog.Error("call json.Unmarshal failed").Err(err).
-			Field("url", cli.fullURL).Field("statusCode", resp.StatusCode).Log()
 		return nil, err
 	}
 	err = fmt.Errorf("http status code not 200, is %d", resp.StatusCode)
-	wlog.Error("call cli.client.Do failed").Err(err).Field("url", cli.fullURL).Field("errorResp", errorResp).Log()
 	return nil, err
 }
 

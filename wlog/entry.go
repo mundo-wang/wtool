@@ -62,8 +62,8 @@ func Msgf(format string, args ...interface{}) LoggerEntry {
 // 获取调用日志的函数或方法全名的最后一部分，一般来说是最后一个斜杠后的部分
 // 对于函数，其全名为module/paths/pkg.FuncName(其中paths是从模块根目录到包的相对路径)，处理后返回的是pkg.FuncName
 // 对于方法，其全名同理于函数，处理后返回的是pkg.(*Type).MethodName或者pkg.Type.MethodName
-func callerName(skip int) string {
-	pc, _, _, ok := runtime.Caller(skip + 1) // 这里需要+1，是因为要先跳转到调用callerName的write方法
+func callerName(callerSkip int) string {
+	pc, _, _, ok := runtime.Caller(callerSkip + 1) // 这里需要+1，是因为要先跳转到调用callerName的write方法
 	if ok {
 		fullName := runtime.FuncForPC(pc).Name()
 		baseName := path.Base(fullName)

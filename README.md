@@ -44,6 +44,63 @@ wlog.Error("call xxx failed").Err(err).Field("name", "lisi").Log()
 {"level":"ERROR","time":"2024-12-16 09:43:08","line":"test06/main.go:46","message":"call xxx failed","error":"some errors","name":"lisi","caller":"main.CallSome"}
 ```
 
+2026-01-20更新，在之前的日志工具中，我们会发现一个问题，那就是它的调用流程是如下所示的：
+
+```go
+wlog.Error("call xxx failed").Err(err).Field("xxx", "xxx").Log()
+```
+
+该日志调用最终必须以一个`Log()`方法作为收尾。如果未调用该方法，既不会产生任何编译错误，也不会在运行期报错，但日志将不会被打印。而这个`Log()`方法本身又极易被开发人员忽略，一旦遗漏，就会导致日志缺失，在后续排查问题时会引发困惑。
+
+所以我们设计更改了日志调用链的结构，如下所示：
+
+```go
+wlog.Msg("call xxx failed").Err(err).Field("xxx", "xxx").Error()
+```
+
+在这里，我们将日志级别方法放在调用链的最后，用以替代原本的`Log()`方法。这样在视觉和使用习惯上可以更直观地引导开发人员完整编写调用链，从而降低被忽略的风险，避免因遗漏而导致日志未打印的问题。
+
+除此之外，我们还引入了链路追踪`Id`，用于在接口调用失败时，通过`traceId`快速定位相关日志。
+
+工程上的做法是，后端接口应为每个请求生成一个唯一的`traceId`，无论请求成功还是失败，都将该`traceId`返回给客户端，例如设置响应头`X-Trace-Id: xxx`，或者在响应体中返回：
+
+```json
+{
+  "code": 50001,
+  "message": "内部错误",
+  "trace_id": "xxx"
+}
+```
+
+这样，当调用端发现接口报错时，可以通过`traceId`将问题反馈给接口开发人员，开发人员则可借助该`traceId`快速定位到对应日志，从而高效地分析和解决问题。
+
+在业务接口中，可以通过调用`WithTraceId`将`traceId`写入`ctx`对象，这一步通常应在`Gin`中间件中完成：
+
+```go
+func TraceMiddleware(c *gin.Context) {
+	ctx := c.Request.Context()
+    node, _ := snowflake.NewNode(1)
+	traceId := node.Generate() // 生成雪花算法ID
+	ctx = wlog.WithTraceId(ctx, traceId)
+	c.Request = c.Request.WithContext(ctx) // 把写入了traceId的新ctx写回c.Request中
+    c.Next()
+}
+```
+
+加入`ctx`对象后，日志的调用链就变成下面这样：
+
+```go
+wlog.Msg("call xxx failed").Ctx(ctx).Err(err).Field("xxx", "xxx").Error()
+```
+
+这样，打印的结构化日志内容如下所示：
+
+```json
+{"level":"ERROR","time":"2026-01-09 23:22:14","line":"my-prac/main.go:21","message":"call xxx failed","trace_id":"7415407145912410112","error":"this is an error","xxx":"xxx","caller":"main.main"}
+```
+
+后续在`Gin`接口返回时，可以调用`GetTraceId`函数获取之前写入的`traceId`值，从而方便将其返回给调用端。
+
 ### 2. `HTTP`工具
 
 我们在使用`http`库调用公共接口时，通常需要执行以下步骤：

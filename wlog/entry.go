@@ -20,7 +20,7 @@ func WithTraceId(ctx context.Context, traceID string) context.Context {
 	return context.WithValue(ctx, traceIdKey, traceID)
 }
 
-// 如果没有使用WithTraceId设置trackId，这里会返回空字符串
+// 如果没有使用WithTraceId设置traceId，这里会返回空字符串
 func GetTraceId(ctx context.Context) string {
 	v, _ := ctx.Value(traceIdKey).(string)
 	return v
@@ -32,12 +32,12 @@ type LoggerEntry interface {
 	Err(err error) LoggerEntry
 	Skip(skip int) LoggerEntry
 
-	Debug()
-	Info()
-	Warn()
-	Error()
-	Fatal()
-	Panic()
+	LevelDebug()
+	LevelInfo()
+	LevelWarn()
+	LevelError()
+	LevelFatal()
+	LevelPanic()
 }
 
 type loggerEntry struct {
@@ -112,26 +112,26 @@ func (l *loggerEntry) write(level zapcore.Level) {
 		Write()
 }
 
-func (l *loggerEntry) Debug() {
+func (l *loggerEntry) LevelDebug() {
 	l.write(zapcore.DebugLevel)
 }
 
-func (l *loggerEntry) Info() {
+func (l *loggerEntry) LevelInfo() {
 	l.write(zapcore.InfoLevel)
 }
 
-func (l *loggerEntry) Warn() {
+func (l *loggerEntry) LevelWarn() {
 	l.write(zapcore.WarnLevel)
 }
 
-func (l *loggerEntry) Error() {
+func (l *loggerEntry) LevelError() {
 	l.write(zapcore.ErrorLevel)
 }
 
-func (l *loggerEntry) Fatal() {
+func (l *loggerEntry) LevelFatal() {
 	l.write(zapcore.FatalLevel)
 }
 
-func (l *loggerEntry) Panic() {
+func (l *loggerEntry) LevelPanic() {
 	l.write(zapcore.PanicLevel)
 }

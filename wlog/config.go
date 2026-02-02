@@ -9,21 +9,37 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var logger *zap.Logger
+var (
+	logger      *zap.Logger
+	shanghaiLoc *time.Location
+)
 
 func init() {
-	zapConfig := loadZapConfig()
 	var err error
+	shanghaiLoc, err = time.LoadLocation("Asia/Shanghai") // 使用CST时间
+	if err != nil {
+		shanghaiLoc = time.UTC // 如果加载时区出错，则使用UTC时间
+	}
+	zapConfig := loadZapConfig()
 	logger, err = zapConfig.Build()
 	if err != nil {
 		log.Fatalf("failed to initialize logger, err: %v", err)
 	}
 }
 
+func isDevEnv() bool {
+	switch os.Getenv("ENV") {
+	case "dev", "development", "local":
+		return true
+	default:
+		return false
+	}
+}
+
 func loadZapConfig() zap.Config {
 	zapConfig := zap.Config{}
 	// 仅当明确是开发环境时，才使用Development配置，其余环境（测试、预发、生产等）统一使用结构化日志
-	if os.Getenv("env") == "development" {
+	if isDevEnv() {
 		zapConfig = zap.NewDevelopmentConfig()
 		zapConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		zapConfig.OutputPaths = []string{"stdout"}
@@ -41,10 +57,6 @@ func loadZapConfig() zap.Config {
 }
 
 func customTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-	loc, err := time.LoadLocation("Asia/Shanghai") // 使用CST时间
-	if err != nil {
-		loc = time.UTC // 如果加载时区出错，则使用UTC时间
-	}
-	t = t.In(loc)
-	enc.AppendString(t.Format("2006-01-02 15:04:05"))
+	t = t.In(shanghaiLoc)
+	enc.AppendString(t.Format(time.DateTime))
 }

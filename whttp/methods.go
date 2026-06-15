@@ -15,12 +15,13 @@ import (
 	"github.com/google/go-querystring/query"
 )
 
+// WithBaseURL 设置请求的基础URL地址
 func (cli *httpClient[T]) WithBaseURL(baseURL string) HttpClient[T] {
 	cli.baseURL = baseURL
 	return cli
 }
 
-// 设置接口超时时间，如果timeout = 0，代表无超时时间
+// WithTimeout 设置请求超时时间，timeout为0表示不限制超时
 func (cli *httpClient[T]) WithTimeout(timeout time.Duration) HttpClient[T] {
 	if timeout > 0 {
 		cli.client.Timeout = timeout
@@ -28,7 +29,7 @@ func (cli *httpClient[T]) WithTimeout(timeout time.Duration) HttpClient[T] {
 	return cli
 }
 
-// retryCount为最大重试次数，retryDelay为基础等待时间，maxRetryDelay为最大等待时间
+// WithRetry 配置请求重试策略，包括最大重试次数、首次重试延迟和最大重试延迟上限
 func (cli *httpClient[T]) WithRetry(retryCount int, retryDelay, maxRetryDelay time.Duration) HttpClient[T] {
 	if retryCount <= 0 {
 		retryCount = 1
@@ -45,7 +46,7 @@ func (cli *httpClient[T]) WithRetry(retryCount int, retryDelay, maxRetryDelay ti
 	return cli
 }
 
-// 设置JSON请求体
+// WithJsonBody 将传入的对象序列化为JSON并设置为请求体，同时自动添加Content-Type请求头
 func (cli *httpClient[T]) WithJsonBody(body interface{}) HttpClient[T] {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
@@ -60,7 +61,7 @@ func (cli *httpClient[T]) WithJsonBody(body interface{}) HttpClient[T] {
 // 用于匹配baseURL模板中的占位符，如/user/{uid}/order/{oid}
 var rePathVar = regexp.MustCompile(`\{([^{}]+)}`)
 
-// 填充baseURL中的路径参数，支持占位符替换
+// WithPathParam 按顺序替换baseURL中的路径占位符（如{uid}），参数数量必须与占位符数量一致
 func (cli *httpClient[T]) WithPathParam(args ...string) HttpClient[T] {
 	matches := rePathVar.FindAllString(cli.baseURL, -1)
 	if len(matches) != len(args) {
@@ -78,7 +79,7 @@ func (cli *httpClient[T]) WithPathParam(args ...string) HttpClient[T] {
 	return cli
 }
 
-// 设置单个查询参数
+// WithQueryParam 添加单个URL查询参数，value为空字符串时忽略
 func (cli *httpClient[T]) WithQueryParam(key, value string) HttpClient[T] {
 	if value != "" {
 		cli.queryParams.Set(key, value)
@@ -86,7 +87,7 @@ func (cli *httpClient[T]) WithQueryParam(key, value string) HttpClient[T] {
 	return cli
 }
 
-// 通过map设置多个查询参数
+// WithQueryParamByMap 通过键值对Map批量添加URL查询参数
 func (cli *httpClient[T]) WithQueryParamByMap(params map[string]string) HttpClient[T] {
 	for key, value := range params {
 		cli.WithQueryParam(key, value)
@@ -94,7 +95,7 @@ func (cli *httpClient[T]) WithQueryParamByMap(params map[string]string) HttpClie
 	return cli
 }
 
-// 通过结构体对象，设置多个查询参数
+// WithQueryParamByStruct 通过带url标签的结构体批量添加URL查询参数
 func (cli *httpClient[T]) WithQueryParamByStruct(params interface{}) HttpClient[T] {
 	queryParams, err := query.Values(params)
 	if err != nil {
@@ -109,7 +110,7 @@ func (cli *httpClient[T]) WithQueryParamByStruct(params interface{}) HttpClient[
 	return cli
 }
 
-// 设置单个请求头
+// WithHeader 添加单个请求头，value为空字符串时忽略
 func (cli *httpClient[T]) WithHeader(key, value string) HttpClient[T] {
 	if value != "" {
 		cli.headers[key] = value
@@ -117,7 +118,7 @@ func (cli *httpClient[T]) WithHeader(key, value string) HttpClient[T] {
 	return cli
 }
 
-// 通过map设置多个请求头
+// WithHeaderByMap 通过键值对Map批量添加请求头
 func (cli *httpClient[T]) WithHeaderByMap(headers map[string]string) HttpClient[T] {
 	for key, value := range headers {
 		cli.WithHeader(key, value)
@@ -125,7 +126,7 @@ func (cli *httpClient[T]) WithHeaderByMap(headers map[string]string) HttpClient[
 	return cli
 }
 
-// 发送请求并封装响应
+// Send 发送HTTP请求并将响应体反序列化为泛型类型T，失败时返回错误
 func (cli *httpClient[T]) Send() (ResponseWrapper[T], error) {
 	if cli.err != nil {
 		return nil, cli.err
@@ -138,28 +139,7 @@ func (cli *httpClient[T]) Send() (ResponseWrapper[T], error) {
 	return cli.handleResponse(httpResp)
 }
 
-func (cli *httpClient[T]) buildRequest() (*http.Request, error) {
-	var fullURL string
-	if len(cli.queryParams) > 0 {
-		fullURL = fmt.Sprintf("%s?%s", cli.baseURL, cli.queryParams.Encode())
-	} else {
-		fullURL = cli.baseURL
-	}
-	cli.fullURL = fullURL
-	var body io.Reader
-	if cli.jsonBody != nil {
-		body = bytes.NewBuffer(cli.jsonBody)
-	}
-	req, err := http.NewRequest(cli.method, fullURL, body)
-	if err != nil {
-		return nil, err
-	}
-	for key, value := range cli.headers {
-		req.Header.Set(key, value)
-	}
-	return req, nil
-}
-
+// executeRequest 执行HTTP请求，支持带指数退避和随机抖动的超时重试机制
 func (cli *httpClient[T]) executeRequest() (*http.Response, error) {
 	var lastErr error
 	attempts := 1 + cli.retryCount // 1次正常请求 + N次重试
@@ -193,6 +173,30 @@ func (cli *httpClient[T]) executeRequest() (*http.Response, error) {
 	return nil, lastErr
 }
 
+// buildRequest 根据已配置的URL、查询参数、请求体和请求头构建http.Request对象
+func (cli *httpClient[T]) buildRequest() (*http.Request, error) {
+	var fullURL string
+	if len(cli.queryParams) > 0 {
+		fullURL = fmt.Sprintf("%s?%s", cli.baseURL, cli.queryParams.Encode())
+	} else {
+		fullURL = cli.baseURL
+	}
+	cli.fullURL = fullURL
+	var body io.Reader
+	if cli.jsonBody != nil {
+		body = bytes.NewBuffer(cli.jsonBody)
+	}
+	req, err := http.NewRequest(cli.method, fullURL, body)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range cli.headers {
+		req.Header.Set(key, value)
+	}
+	return req, nil
+}
+
+// handleResponse 读取HTTP响应体，2xx状态码时反序列化为T类型，否则返回包含状态码的错误
 func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T], error) {
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -200,8 +204,18 @@ func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		var respData T
-		if err = json.Unmarshal(respBytes, &respData); err != nil {
-			return nil, err
+		switch any(respData).(type) {
+		// 如果T为[]byte或json.RawMessage，说明不需要反序列化JSON到具体类型，直接赋值字节数组
+		case []byte:
+			respData = any(respBytes).(T)
+		case json.RawMessage:
+			respData = any(json.RawMessage(respBytes)).(T)
+		default:
+			if len(respBytes) > 0 {
+				if err = json.Unmarshal(respBytes, &respData); err != nil {
+					return nil, err
+				}
+			}
 		}
 		handler := &responseWrapper[T]{
 			respHeaders: resp.Header,
@@ -210,31 +224,31 @@ func (cli *httpClient[T]) handleResponse(resp *http.Response) (ResponseWrapper[T
 		}
 		return handler, nil
 	}
+	err = fmt.Errorf("http status code not 2xx, is %d", resp.StatusCode)
 	var errorResp map[string]any
-	if err = json.Unmarshal(respBytes, &errorResp); err != nil {
-		return nil, err
+	if jsonErr := json.Unmarshal(respBytes, &errorResp); jsonErr == nil {
+		err = fmt.Errorf("%w, body: %v", err, errorResp)
 	}
-	err = fmt.Errorf("http status code not 200, is %d", resp.StatusCode)
 	return nil, err
 }
 
-// 返回响应体的字节数组
+// GetRespBytes 返回响应体的原始字节数组
 func (cli *responseWrapper[T]) GetRespBytes() []byte {
 	return cli.respBytes
 }
 
-// 返回响应体反序列化的对象
+// GetRespData 返回响应体反序列化后的泛型类型T对象
 func (cli *responseWrapper[T]) GetRespData() T {
 	return cli.respData
 }
 
-// GetRespHeader 获取指定key关联的第一个值，如果无关联，返回空字符串
+// GetRespHeader 获取响应头中指定key的第一个值，不存在则返回空字符串
 func (cli *responseWrapper[T]) GetRespHeader(key string) string {
 	value := cli.respHeaders.Get(key)
 	return value
 }
 
-// GetRespHeaderMulti 获取指定key关联的所有值，如果无关联，返回空切片
+// GetRespHeaderMulti 获取响应头中指定key的所有值，不存在则返回空切片
 func (cli *responseWrapper[T]) GetRespHeaderMulti(key string) []string {
 	values := cli.respHeaders.Values(key)
 	return values

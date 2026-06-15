@@ -69,7 +69,7 @@ func NewDelete[T any]() HttpClient[T] {
 	return newHttpClient[T](http.MethodDelete)
 }
 
-// 泛型类型参数T表示返回的数据结构类型
+// newHttpClient 初始化HttpClient，配置默认的连接池参数和空请求头/查询参数
 func newHttpClient[T any](method string) HttpClient[T] {
 	// 这里设置的都是默认值，可根据后端服务场景进行修改
 	transport := &http.Transport{
@@ -88,6 +88,7 @@ func newHttpClient[T any](method string) HttpClient[T] {
 	}
 }
 
+// isTimeoutError 判断给定错误是否为网络超时错误
 func isTimeoutError(err error) bool {
 	if err == nil {
 		return false
